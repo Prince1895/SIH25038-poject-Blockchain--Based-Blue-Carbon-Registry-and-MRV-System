@@ -5,9 +5,9 @@ Blue carbon ecosystem restoration is gaining importance in India’s climate str
 ***Folder Structure***
 ```
 /
-├── backend/          // Your Node.js, Express.js server code
-├── contracts/        // Your Solidity smart contracts
-├── frontend/         // The Mobile App & Web App code
-├── ml-model/         // The Python code for the ML model
-└── docs/             // Documentation, flowchart, API design
+├── backend/          
+├── contracts/        
+├── frontend/         
+├── ml-model/        
+└── docs/          
 ```
