@@ -1,132 +1,137 @@
-
-import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import otpGenerator from "otp-generator";
-import twilio from "twilio";
-import nodemailer from "nodemailer";
-import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
+import User from "../model/User.js";
+// ✅ ADDED: Import your utility functions
+import { sendEmail } from "../utils/sendEmail.js";
+import { sendSms } from "../utils/sendSms.js";
 
-dotenv.config();
+// Helper function to generate tokens
+const generateToken = (user) => {
+  return jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+};
 
-
-// JWT secret
-const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
-
-let otpStore = {};
-
+// Register User
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role, ngoId, phone } = req.body;
-
-    // Check if user already exists
+    const { name, email, phone, password, role } = req.body;
     const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: "User already exists" });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 min
 
-    // status = pending until admin approves
-    const user = new User({
+    const newUser = new User({
       name,
       email,
-      password: hashedPassword,
-      role,          // ["ngo", "fieldworker", "admin"]
-      ngoId,         // for NGO only
       phone,
-      status: "pending",
-      aadhaarVerified: false
+      password: hashedPassword,
+      role,
+      otp,
+      otpExpires,
     });
 
-    await user.save();
-    res.status(201).json({ message: "Registration successful. Awaiting admin approval." });
-  } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
+    await newUser.save();
+    
+    // ✅ UNCOMMENTED: Calling your email and SMS functions
+    await sendEmail(email, "OTP Verification", `Your OTP is: ${otp}. It is valid for 10 minutes.`);
+    if (phone) {
+      await sendSms(phone, otp);
+    }
+
+    res.status(201).json({
+      message: "User registered. Please verify OTP sent to your email and phone.",
+    });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
+// Verify OTP
+export const verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.otp !== otp || user.otpExpires < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    user.isVerified = true;
+    user.otp = null;
+    user.otpExpires = null;
+    await user.save();
+
+    const token = generateToken(user);
+
+    res.status(200).json({
+      message: "OTP verified successfully",
+      token,
+      user: { id: user._id, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Login
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Find user
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Check if approved
-    if (user.status !== "approved") {
-      return res.status(403).json({ message: "Account not approved by admin" });
-    }
+    if (!user.isVerified)
+      return res.status(400).json({ message: "Account not verified. Please check your email for the OTP." });
 
-    // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-    // Sign JWT
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: "1h" });
+    const token = generateToken(user);
 
     res.status(200).json({
       message: "Login successful",
       token,
-      user: { id: user._id, name: user.name, role: user.role }
+      user: { id: user._id, email: user.email, role: user.role },
     });
-  } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-export const sendOTP = async (req, res) => {
+// Resend OTP
+export const resendOtp = async (req, res) => {
   try {
-    const { phone, email } = req.body;
-
-    const otp = otpGenerator.generate(6, { upperCase: false, specialChars: false });
-    otpStore[phone] = otp;
-
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
     
-    if (phone) {
-      const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
-      await client.messages.create({
-        body: `Your Aadhaar OTP is ${otp}`,
-        from: process.env.TWILIO_PHONE,
-        to: phone
-      });
+    if (user.isVerified) {
+        return res.status(400).json({ message: "User is already verified." });
     }
 
-    if (email) {
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-      });
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = otp;
+    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "Aadhaar OTP Verification",
-        text: `Your OTP is ${otp}`
-      });
+    await user.save();
+    
+    // ✅ UNCOMMENTED: Calling your email and SMS functions again
+    await sendEmail(email, "Resend OTP", `Your new OTP is: ${otp}`);
+    if (user.phone) {
+      await sendSms(user.phone, otp);
     }
 
-    res.status(200).json({ message: "OTP sent successfully" });
-  } catch (err) {
-    res.status(500).json({ message: "Error sending OTP", error: err.message });
+    res.status(200).json({ message: "OTP resent successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
   }
 };
-
-export const verifyOTP = async (req, res) => {
-  try {
-    const { phone, otp } = req.body;
-
-    if (otpStore[phone] && otpStore[phone] === otp) {
-
-      await User.findOneAndUpdate({ phone }, { aadhaarVerified: true });
-
-      delete otpStore[phone];
-      return res.status(200).json({ message: "OTP Verified Successfully" });
-    }
-
-    res.status(400).json({ message: "Invalid or expired OTP" });
-  } catch (err) {
-    res.status(500).json({ message: "Error verifying OTP", error: err.message });
-  }
-};
-
-
