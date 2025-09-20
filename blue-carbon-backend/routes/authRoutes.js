@@ -73,21 +73,35 @@ router.post('/activate', async (req, res) => {
 // --- 3. LOGIN (Request OTP) ---
 router.post('/login', async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ error: "Email and password are required." });
+        }
+
+        // Find the user in any of the tables
         let user = await prisma.industry.findUnique({ where: { email } }) ||
                    await prisma.verifier.findUnique({ where: { email } }) ||
                    await prisma.publicUser.findUnique({ where: { email } });
 
+        // Check if user exists and is active/approved
         if (!user || !user.isActive || (user.status && user.status !== 'APPROVED')) {
-            return res.status(403).json({ error: "Account not active or not approved." });
+            return res.status(401).json({ error: "Invalid credentials or account not approved/active." });
         }
 
+        // Check if the provided password is correct
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ error: "Invalid credentials." });
+        }
+
+        // If password is valid, send OTP
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
         await prisma.oTP.create({ data: { email, code: otpCode, expiresAt: new Date(Date.now() + 10 * 60 * 1000) } });
-        await sendOtpEmail(email, otpCode, "Your Login Code");
+        await sendOtpEmail(email, otpCode, "Your Login Verification Code");
 
-        res.status(200).json({ message: "Login OTP sent to your email." });
+        res.status(200).json({ message: "Password verified. Please check your email for an OTP to complete your login." });
     } catch (error) {
+        console.error("Login error:", error);
         res.status(500).json({ error: "Login failed." });
     }
 });
