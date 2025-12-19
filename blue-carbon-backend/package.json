@@ -13,12 +13,11 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-<<<<<<< HEAD
-=======
-    "@aws-sdk/client-s3": "^3.891.0",
-    "@aws-sdk/s3-request-presigner": "^3.891.0",
+    "@aws-sdk/client-s3": "^3.940.0",
+    "@aws-sdk/s3-request-presigner": "^3.940.0",
+    "@aws-sdk/signature-v4": "^3.370.0",
+    "@aws-sdk/util-create-request": "^3.936.0",
     "@prisma/client": "^6.16.2",
->>>>>>> e99cc1959b0f0e4dbef2ea538e04ac285d577659
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",

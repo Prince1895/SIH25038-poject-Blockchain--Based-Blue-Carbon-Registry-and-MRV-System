@@ -5,8 +5,8 @@ import { contractAbi } from './abi.js';
 import './App.css';
 
 // --- CONFIGURATION ---
-const API_URL = 'http://localhost:5001/api';
-const CONTRACT_ADDRESS = "YOUR_LIVE_SEPOLIA_CONTRACT_ADDRESS"; // 👈 Replace this
+const API_URL = 'https://backendcarbon.onrender.com/api';
+const CONTRACT_ADDRESS = "YOUR_LIVE_SEPOLIA_CONTRACT_ADDRESS"; 
 
 function App() {
   // State for forms and data
@@ -93,7 +93,7 @@ function App() {
         <input name="email" placeholder="Admin Email" onChange={handleChange} />
         <input name="password" type="password" placeholder="Admin Password" onChange={handleChange} />
         <input name="secret" placeholder="ADMIN_SETUP_SECRET" onChange={handleChange} />
-        <button onClick={() => apiCall('post', '/setup/initial-admin', { email: formData.email, password: formData.password, secret: formData.secret })}>Create Initial Admin</button>
+        <button onClick={() => apiCall('post', '/setup/register', { email: formData.email, password: formData.password, secret: formData.secret })}>Create Initial Admin</button>
       </div>
 
       <div className="card">

@@ -1,4 +1,4 @@
-// In prisma/schema.prisma
+// prisma/schema.prisma
 
 datasource db {
   provider = "postgresql"
@@ -9,61 +9,238 @@ generator client {
   provider = "prisma-client-js"
 }
 
+/////////////////////
+// ENUMS (IMPORTANT)
+/////////////////////
 
+enum AccountStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+/////////////////////
+// INDUSTRY USER
+/////////////////////
 
 model Industry {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String
-  password  String
-  tier      Int      
-  status    String   @default("PENDING_APPROVAL")
-  isActive  Boolean  @default(false)
-  role      String   @default("INDUSTRY") 
-  walletAddress String?  
-  projectId     Int?  
-  tasks     VerificationTask[]
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String
+
+  // Frontend fields
+  firstName    String
+  lastName     String
+  phone        String
+  organization String
+  designation  String
+  description  String
+
+  tier     Int?
+  status   AccountStatus @default(PENDING_APPROVAL)
+  isActive Boolean       @default(false)
+  role     String        @default("INDUSTRY")
+
+  walletAddress String?
+  projectId     Int?
+
+  tasks    VerificationTask[]
+  projects Project[]
+
+  auctions               Auction[]
+  tokenizationRequests   TokenizationRequest[]
+  blockchainTransactions BlockchainTransaction[]
+  creditLedgers          CreditLedger[]
+  reports                Report[]
+
+  createdAt DateTime @default(now())
 }
+
+/////////////////////
+// VERIFIER (NGO)
+/////////////////////
 
 model Verifier {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String
-  password  String
-  status    String   @default("PENDING_APPROVAL")
-  isActive  Boolean  @default(false)
-  role      String   @default("VERIFIER") 
-  tasks     VerificationTask[]
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String
+
+  // Frontend fields
+  firstName    String
+  lastName     String
+  phone        String
+  organization String
+  designation  String
+  description  String
+
+  status   AccountStatus @default(PENDING_APPROVAL)
+  isActive Boolean       @default(false)
+  role     String        @default("VERIFIER")
+
+  tasks VerificationTask[]
+
+  createdAt DateTime @default(now())
 }
+
+/////////////////////
+// ADMIN / PUBLIC USER
+/////////////////////
+
 model PublicUser {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String
-  password  String
-  isActive  Boolean  @default(false) // Needs OTP verification but not admin approval
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String
+
+  // Frontend fields
+  firstName    String
+  lastName     String
+  phone        String
+  organization String
+  designation  String
+  description  String
+
+  isActive Boolean @default(false)
+  role     String  @default("ADMIN")
+
+  createdAt DateTime @default(now())
 }
+
+/////////////////////
+// VERIFICATION TASK
+/////////////////////
 
 model VerificationTask {
-  id          Int      @id @default(autoincrement())
-  createdAt   DateTime @default(now())
-  dueDate     DateTime
-  status      String   // e.g., "ASSIGNED", "COMPLETED", "APPROVED"
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  dueDate   DateTime
+  status    String // ASSIGNED | COMPLETED | APPROVED
 
-  industry    Industry @relation(fields: [industryId], references: [id])
-  industryId  Int
+  industry   Industry @relation(fields: [industryId], references: [id])
+  industryId Int
 
-  verifier    Verifier @relation(fields: [verifierId], references: [id])
-  verifierId  Int
+  verifier   Verifier @relation(fields: [verifierId], references: [id])
+  verifierId Int
+
   transactionHash String?
   tokenId         Int?
 
   evidenceLinks String[]
 }
 
+/////////////////////
+// OTP MODEL
+/////////////////////
+
 model OTP {
-    id        Int      @id @default(autoincrement())
-    email     String?
-    mobile    String?
-    code      String
-    expiresAt DateTime
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String
+  expiresAt DateTime
+}
+
+model Project {
+  id                 Int      @id @default(autoincrement())
+  name               String
+  location           String
+  area               String //required
+  status             String
+  progress           Int
+  creditsGenerated   Int
+  creditsProjected   Int
+  startDate          DateTime
+  endDate            DateTime
+  verificationStatus String
+  lastMRV            String
+
+  industryId Int
+  industry   Industry @relation(fields: [industryId], references: [id])
+
+  reports  Report[]
+  auctions Auction[]
+}
+
+model Auction {
+  id            Int      @id @default(autoincrement())
+  projectName   String
+  creditsAmount Int
+  startingPrice Float
+  currentBid    Float
+  bidCount      Int
+  endTime       DateTime
+  status        String // active | upcoming | ended
+
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id])
+
+  industryId Int
+  industry   Industry @relation(fields: [industryId], references: [id])
+
+  bids      Bid[]
+  createdAt DateTime @default(now())
+}
+
+model Bid {
+  id        Int      @id @default(autoincrement())
+  amount    Float
+  bidder    String // wallet or org name
+  auctionId Int
+  auction   Auction  @relation(fields: [auctionId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model TokenizationRequest {
+  id            Int       @id @default(autoincrement())
+  projectName   String
+  credits       Int
+  status        String // pending | processing | completed
+  submittedDate DateTime
+  completedDate DateTime?
+
+  industryId Int
+  industry   Industry @relation(fields: [industryId], references: [id])
+}
+
+model BlockchainTransaction {
+  id     Int      @id @default(autoincrement())
+  type   String // mint | sell | transfer
+  amount Int
+  price  Float
+  txHash String
+  status String
+  date   DateTime
+
+  industryId Int
+  industry   Industry @relation(fields: [industryId], references: [id])
+}
+
+model CreditLedger {
+  id               Int    @id @default(autoincrement())
+  project          String
+  totalCredits     Int
+  availableCredits Int
+  soldCredits      Int
+  averagePrice     Float
+  currentValue     Float
+
+  industryId Int
+  industry   Industry @relation(fields: [industryId], references: [id])
+}
+
+model Report {
+  id                Int       @id @default(autoincrement())
+  title             String
+  project           String // ✅ project name for UI
+  type              String
+  status            String
+  submissionDate    DateTime?
+  reviewDate        DateTime?
+  verifier          String
+  carbonSequestered String
+
+  // ✅ RELATION (RENAMED)
+  projectId  Int?
+  projectRef Project? @relation(fields: [projectId], references: [id])
+
+  industryId Int
+  industry   Industry @relation(fields: [industryId], references: [id])
 }

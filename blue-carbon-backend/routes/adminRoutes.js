@@ -54,14 +54,7 @@ router.post('/tasks', authMiddleware, isAdmin, async (req, res) => {
 });
 
 
-// In routes/adminRoutes.js
-// ... (your existing imports and routes)
 
-/**
- * @notice POST /api/admin/tasks/:taskId/approve-and-mint
- * @dev    PROTECTED: Admin only. Approves a completed task and mints the carbon credit NFT.
- * @body   { "tokenURI": "ipfs://your_metadata_hash_for_token" }
- */
 router.post('/tasks/:taskId/approve-and-mint', authMiddleware, isAdmin, async (req, res) => {
     try {
         const taskId = parseInt(req.params.taskId);

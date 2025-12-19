@@ -13,6 +13,9 @@ const adminRoutes = require('./routes/adminRoutes');
 const authRoutes = require('./routes/authRoutes');
 const setupRoutes = require('./routes/setupRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const dashboardRoutes = require("./routes/dashboardRoutes");
+
+
 
 // --- 2. INITIALIZATIONS ---
 const app = express();
@@ -50,6 +53,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/setup', setupRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use("/api", dashboardRoutes);
+app.use("/api/admin", require("./routes/admin.routes"));
+
+
 
 // --- 6. SERVER START ---
 app.listen(PORT, () => {

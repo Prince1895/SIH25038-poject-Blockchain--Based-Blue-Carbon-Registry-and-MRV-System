@@ -1,28 +1,42 @@
-// In middleware/authMiddleware.js
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 const authMiddleware = (req, res, next) => {
-    // Get the token from the Authorization header
+  try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Unauthorized: No token provided.' });
+    // 1️⃣ Token presence check
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        error: "Unauthorized: Token missing",
+      });
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.split(" ")[1];
 
-    try {
-        // Verify the token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // 2️⃣ Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Attach the decoded user info to the request object
-        req.user = decoded; 
-
-        // Move to the next function in the chain
-        next();
-    } catch (error) {
-        return res.status(401).json({ error: 'Unauthorized: Invalid token.' });
+    // 3️⃣ Standardize user object (VERY IMPORTANT)
+    if (!decoded.id) {
+      return res.status(401).json({
+        error: "Unauthorized: Invalid token payload",
+      });
     }
+
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+      email: decoded.email,
+    };
+
+    next();
+  } catch (error) {
+    console.error("AUTH ERROR:", error.message);
+
+    return res.status(401).json({
+      error: "Unauthorized: Invalid or expired token",
+    });
+  }
 };
 
 module.exports = authMiddleware;
